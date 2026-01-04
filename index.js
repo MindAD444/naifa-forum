@@ -11,13 +11,13 @@ import postRoutes from "./routes/posts.js";
 import knowledgeRoutes from "./routes/knowledge.js";
 import adminRoutes from "./routes/admin.js";
 import commentRoutes from "./routes/comments.js";
+import usersRoutes from "./routes/users.js";
 import { connectDB } from "./config/db.js";
 import sitemapRoute from "./routes/sitemap.js";
 import autoModerateRoutes from './routes/auto-moderate.js';
 
 dotenv.config();
 
-// 👉 BẮT BUỘC await để Mongoose connect xong trước khi xử lý route
 await connectDB();
 
 const app = express();
@@ -42,8 +42,14 @@ app.use("/", sitemapRoute);
 app.use("/posts", postRoutes);
 app.use("/admin", adminRoutes);
 app.use("/comments", commentRoutes);
+app.use('/users', usersRoutes);
 app.use('/information', knowledgeRoutes);
 app.use('/admin/auto-moderate', autoModerateRoutes);
+
+// Serve profile page for friendly /@<uuid> URLs (before static middleware)
+app.get('/@:uuid', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'profile.html'));
+});
 
 app.use(express.static(path.join(__dirname, "public")));
 

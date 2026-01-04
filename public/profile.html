@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Hồ sơ cá nhân - Forum</title>
-  <link rel="icon" href="./favicon.svg" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" sizes="192x192" href="/favicon-192.png">
+  <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
 
@@ -19,245 +19,494 @@
 
   <main class="profile-container">
     <h2>Hồ sơ cá nhân</h2>
-    
-    <form id="profile-form">
+
+    <div id="profile-view">
       <div class="avatar-wrapper">
-        <img id="avatar-preview" src="https://via.placeholder.com/150" alt="Avatar" class="profile-avatar">
-        <label for="avatar-input" class="upload-label" title="Đổi ảnh đại diện">📷</label>
-        <input type="file" id="avatar-input" accept="image/*">
+        <img id="view-avatar" src="https://via.placeholder.com/150" alt="Avatar" class="profile-avatar">
       </div>
-
-      <div class="form-group">
-        <label>Email (Không thể đổi)</label>
-        <input type="text" id="email" disabled placeholder="Đang tải...">
+      <div class="profile-meta" style="text-align:center; margin-bottom: 16px;">
+        <h3 id="view-username">Tên người dùng</h3>
+        <p id="view-bio" style="color:var(--text-light); margin-top:8px; max-width:640px; margin-left:auto; margin-right:auto; white-space:pre-wrap;"></p>
+        <p id="view-uuid" style="color:var(--text-light)"></p>
+        <p id="view-contact" style="color:var(--text-light)"></p>
+        <div class="profile-actions" style="justify-content:center; margin-top:12px;">
+          <button id="edit-profile-btn" class="btn-primary hidden">Edit profile</button>
+        </div>
       </div>
+    </div>
 
-      <div class="form-group">
-        <label>Tên hiển thị</label>
-        <input type="text" id="username" placeholder="Nhập tên mới" required>
+    <!-- Edit popup -->
+    <div id="edit-popup" class="popup" style="display:none;">
+      <div class="popup-content">
+        <button id="close-edit" class="btn-secondary" style="float:right;">Đóng</button>
+        <h3 style="margin-top:0;">Chỉnh sửa hồ sơ</h3>
+
+        <form id="profile-form">
+          <div class="avatar-wrapper">
+            <img id="avatar-preview" src="https://via.placeholder.com/150" alt="Avatar" class="profile-avatar">
+            <label for="avatar-input" class="upload-label" title="Đổi ảnh đại diện">📷</label>
+            <input type="file" id="avatar-input" accept="image/*">
+          </div>
+
+          <div class="form-group">
+            <label>Email (Không thể đổi)</label>
+            <input type="text" id="email" readonly placeholder="Đang tải...">
+          </div>
+
+          <div class="form-group">
+            <label>Tên hiển thị</label>
+            <input type="text" id="username" placeholder="Nhập tên mới" required>
+          </div>
+          <p id="username-cooldown" style="font-size: 0.9em; margin-top: 5px; color: orange;"></p>
+
+          <div id="uuid-section" class="form-group" style="margin-top:8px;">
+            <label>Mã định danh (UUID)</label>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="text" id="uuid-display" style="flex:1; padding:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg);">
+            </div>
+            <p id="uuid-cooldown" style="font-size:0.9em; margin-top:6px; color:var(--text-light);"></p>
+          </div>
+
+          <div class="form-group">
+            <label>Tiểu sử (Bio)</label>
+            <textarea id="bio" placeholder="Viết vài dòng về bạn..." style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg); min-height:80px;"></textarea>
+          </div>
+        </form>
+
+        <!-- Đổi mật khẩu -->
+        <div class="password-section" style="margin-top:18px; border-top:1px solid var(--border-color); padding-top:12px;">
+          <h4 style="margin:8px 0 12px;">Đổi mật khẩu</h4>
+          <div class="form-group">
+            <label>Mật khẩu hiện tại</label>
+            <input type="password" id="current-password" placeholder="Nhập mật khẩu cũ">
+          </div>
+          <div class="form-group">
+            <label>Mật khẩu mới</label>
+            <input type="password" id="new-password" placeholder="Mật khẩu mới">
+          </div>
+          <div class="form-group">
+            <label>Nhập lại mật khẩu mới</label>
+            <input type="password" id="confirm-password" placeholder="Xác nhận mật khẩu">
+          </div>
+        </div>
+
+        <!-- Nút hành động thẳng hàng -->
+        <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:20px;">
+          <button type="button" id="save-btn" class="btn-primary">Lưu thay đổi</button>
+          <button type="button" id="change-pwd-btn" class="btn-secondary">Cập nhật mật khẩu</button>
+        </div>
+
+        <p id="msg" style="margin-top:12px; text-align:center;"></p>
+        <p id="pwd-msg" style="margin-top:8px; text-align:center; font-size:0.95rem;"></p>
       </div>
-        <p id="username-cooldown" style="font-size: 0.9em; margin-top: 5px;"></p>
-      <button type="submit" class="save-btn" id="save-btn">Lưu thay đổi</button>
-      <p id="msg"></p>
-    </form>
-
-    <hr style="margin: 40px 0; border: 0; border-top: 1px solid #ddd;">
-
-    <h3>🔐 Đổi mật khẩu</h3>
-    <form id="change-password-form">
-      <div class="form-group">
-        <label>Mật khẩu hiện tại (bỏ trống nếu tài khoản Google chưa có mật khẩu)</label>
-        <input type="password" id="current-password" placeholder="Nhập mật khẩu cũ">
-      </div>
-
-      <div class="form-group">
-        <label>Mật khẩu mới</label>
-        <input type="password" id="new-password" placeholder="Tối thiểu 6 ký tự" required>
-      </div>
-
-      <div class="form-group">
-        <label>Xác nhận mật khẩu mới</label>
-        <input type="password" id="confirm-password" placeholder="Nhập lại mật khẩu mới" required>
-      </div>
-
-      <button type="submit" class="save-btn" id="change-pwd-btn" style="background-color: #d9534f;">
-        Cập nhật mật khẩu
-      </button>
-      <p id="pwd-msg"></p>
-    </form>
+    </div>
   </main>
 
-  <script src="theme.js"></script>
+  <script src="/theme.js"></script>
   <script>
-    // Use server-side session (HttpOnly cookie). Do not attempt to read token from JS.
-    // Clear localStorage since site is private and we use cookies for auth state
-    try { localStorage.clear(); } catch (e) { /* ignore */ }
-
-    // Format remaining cooldown days
-    function formatRemainingTime(ms) {
-      const totalDays = Math.ceil(ms / (1000 * 60 * 60 * 24));
-      if (totalDays === 0) return "";
-      return `Bạn có thể đổi tên sau ${totalDays} ngày nữa.`;
-    }
-
-    // Load profile and show cooldown info
+    // ================ HÀM TẢI PROFILE ================
     async function loadProfile() {
-      try {
-          const res = await fetch("/auth/me", { credentials: 'include' });
+      const pathMatch = location.pathname.match(/@([a-zA-Z0-9\-_:]+)/);
+      const targetUuid = pathMatch ? pathMatch[1] : null;
 
-        if (!res.ok) {
-          if (res.status === 401 || res.status === 403) {
-            alert("Phiên đăng nhập hết hạn.");
-            window.location.href = "login.html";
+      console.log("Đang tải profile cho UUID:", targetUuid || "(profile chính mình)");
+
+      let target = null;
+
+      try {
+        if (targetUuid) {
+          const response = await fetch(`/users/${encodeURIComponent(targetUuid)}`, { credentials: 'include' });
+          if (response.ok) {
+            const data = await response.json();
+            target = data.user;
+          } else if (response.status === 404) {
+            document.getElementById('profile-view').innerHTML = 
+              '<p style="text-align:center; color:red; margin:40px 0;">Người dùng không tồn tại.</p>';
+            return;
+          } else {
+            document.getElementById('profile-view').innerHTML = 
+              `<p style="text-align:center; color:red; margin:40px 0;">Lỗi tải dữ liệu: ${response.status}</p>`;
             return;
           }
-          throw new Error("Không thể tải thông tin.");
-        }
-
-        let user;
-        try {
-          user = await res.json();
-        } catch (parseErr) {
-          throw new Error('Dữ liệu trả về từ server không hợp lệ.');
-        }
-
-        document.getElementById("email").value = user.email || "";
-        document.getElementById("username").value = user.username || "";
-        if (user.avatar) document.getElementById("avatar-preview").src = user.avatar;
-
-        // Cooldown logic
-        const cooldownEl = document.getElementById("username-cooldown");
-        const usernameInput = document.getElementById("username");
-        const now = Date.now();
-        const lastChanged = new Date(user.usernameLastChangedAt || user.createdAt).getTime();
-        const changeCount = user.usernameChangeCount || 0;
-        const oneDay = 24 * 60 * 60 * 1000;
-
-        let cooldownDays = 0;
-        if (changeCount === 1) cooldownDays = 7;
-        else if (changeCount >= 2) cooldownDays = 14;
-
-        const cooldownDuration = cooldownDays * oneDay;
-        const nextChangeTime = lastChanged + cooldownDuration;
-
-        if (cooldownDays > 0 && now < nextChangeTime) {
-          const remainingTimeMs = nextChangeTime - now;
-          const remainingMessage = formatRemainingTime(remainingTimeMs);
-          cooldownEl.style.color = "orange";
-          cooldownEl.textContent = `Chính sách đổi tên: Vừa đổi ${changeCount} lần. ${remainingMessage}`;
-          usernameInput.dataset.cooldown = nextChangeTime;
         } else {
-          cooldownEl.style.color = "green";
-          cooldownEl.textContent = changeCount === 0
-            ? "Đây là lần đổi tên đầu tiên của bạn."
-            : `Bạn đã đổi tên ${changeCount} lần.`;
-          usernameInput.dataset.cooldown = 0;
+          const response = await fetch('/auth/me', { credentials: 'include' });
+          if (response.ok) {
+            const data = await response.json();
+            target = data.user || data;
+          } else if (response.status === 401) {
+            document.getElementById('profile-view').innerHTML = 
+              '<p style="text-align:center; color:red; margin:40px 0;">Vui lòng đăng nhập để xem hồ sơ cá nhân.</p>';
+            return;
+          } else {
+            document.getElementById('profile-view').innerHTML = 
+              `<p style="text-align:center; color:red; margin:40px 0;">Lỗi tải dữ liệu: ${response.status}</p>`;
+            return;
+          }
         }
-
       } catch (err) {
-        console.error(err);
-        document.getElementById("msg").style.color = "red";
-        document.getElementById("msg").textContent = "Lỗi tải hồ sơ: " + err.message;
+        console.error('Load profile error:', err);
+        document.getElementById('profile-view').innerHTML = 
+          '<p style="text-align:center; color:red; margin:40px 0;">Lỗi kết nối server. Vui lòng thử lại.</p>';
+        return;
       }
+
+      if (!target || !target.uuid) {
+        document.getElementById('profile-view').innerHTML = 
+          '<p style="text-align:center; color:red; margin:40px 0;">Không tìm thấy thông tin người dùng.</p>';
+        return;
+      }
+
+      window.__targetUser = target;
+      window.__targetUserId = target._id || target.id;
+
+      document.getElementById('view-username').textContent = target.username || 'Tên người dùng';
+      document.getElementById('view-bio').textContent = target.bio || '';
+      document.getElementById('view-uuid').textContent = `UUID: ${target.uuid}`;
+
+      const avatarImg = document.getElementById('view-avatar');
+      avatarImg.src = target.avatar && target.avatar.trim() ? target.avatar : 'https://via.placeholder.com/150';
+
+      // Hiển thị nút Edit
+      const editBtn = document.getElementById('edit-profile-btn');
+      if (editBtn) {
+        let isOwner = !targetUuid;
+        let isAdmin = false;
+        try {
+          const meRes = await fetch('/auth/me', { credentials: 'include' });
+          if (meRes.ok) {
+            const meData = await meRes.json();
+            const currentUser = meData.user || meData;
+            window.__currentUser = currentUser;
+            isOwner = isOwner || currentUser.uuid === target.uuid;
+            isAdmin = currentUser.role === 'admin';
+          }
+        } catch (e) {}
+        if (isOwner || isAdmin) {
+          editBtn.classList.remove('hidden');
+        } else {
+          editBtn.classList.add('hidden');
+        }
+      }
+if (!target) return;
+
+    // --- LOGIC HIỂN THỊ COOLDOWN MỚI ---
+    
+    // 1. Cooldown cho Username (7 ngày)
+    const userLastChanged = target.usernameLastChangedAt || target.createdAt;
+    const userDaysLeft = getCooldownDays(userLastChanged, 7);
+    const usernameCooldownEl = document.getElementById('username-cooldown');
+    
+    if (userDaysLeft > 0) {
+        usernameCooldownEl.textContent = `⏳ Bạn có thể đổi tên sau ${userDaysLeft} ngày nữa.`;
+        usernameCooldownEl.style.color = "orange";
+    } else {
+        usernameCooldownEl.textContent = `✅ Bạn có thể đổi tên ngay bây giờ.`;
+        usernameCooldownEl.style.color = "green";
     }
 
+    // 2. Cooldown cho UUID (30 ngày)
+    const uuidLastChanged = target.uuidLastChangedAt || target.createdAt;
+    const uuidDaysLeft = getCooldownDays(uuidLastChanged, 30);
+    const uuidCooldownEl = document.getElementById('uuid-cooldown');
+    
+    if (uuidDaysLeft > 0) {
+        uuidCooldownEl.textContent = `⏳ Bạn có thể đổi UUID sau ${uuidDaysLeft} ngày nữa.`;
+        uuidCooldownEl.style.color = "orange";
+    } else {
+        uuidCooldownEl.textContent = `✅ Bạn có thể đổi UUID ngay bây giờ.`;
+        uuidCooldownEl.style.color = "green";
+    }
+      // Cập nhật form edit
+      document.getElementById('username').value = target.username || '';
+      document.getElementById('bio').value = target.bio || '';
+      document.getElementById('uuid-display').value = target.uuid || '';
+      document.getElementById('avatar-preview').src = target.avatar && target.avatar.trim() ? target.avatar : 'https://via.placeholder.com/150';
+    }
+
+    // ================ CÁC HÀM KHÁC (EDIT, SAVE, CHANGE PASSWORD) ================
+function getCooldownDays(lastChangedDate, cooldownPeriodDays) {
+    const lastChanged = new Date(lastChangedDate).getTime();
+    const now = Date.now();
+    const cooldownMs = cooldownPeriodDays * 24 * 60 * 60 * 1000;
+    const timePassed = now - lastChanged;
+
+    if (timePassed >= cooldownMs) return 0; // Hết thời gian chờ
+
+    const remainingMs = cooldownMs - timePassed;
+    return Math.ceil(remainingMs / (24 * 60 * 60 * 1000)); // Làm tròn lên số ngày
+}
+    const bioEl = document.getElementById('bio');
+    const avatarInput = document.getElementById('avatar-input');
+
     // Avatar preview
-    const avatarInput = document.getElementById("avatar-input");
-    const avatarPreview = document.getElementById("avatar-preview");
-    avatarInput.onchange = (e) => {
-      const file = e.target.files[0];
-      if (file) avatarPreview.src = URL.createObjectURL(file);
-    };
+    if (avatarInput) {
+      avatarInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            document.getElementById('avatar-preview').src = ev.target.result;
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
 
-    // Submit profile update (username + optional avatar)
-    const form = document.getElementById("profile-form");
-    const msg = document.getElementById("msg");
-    const saveBtn = document.getElementById("save-btn");
+    // Mở/đóng popup
+    const editBtn = document.getElementById('edit-profile-btn');
+    const editPopup = document.getElementById('edit-popup');
+    const closeEdit = document.getElementById('close-edit');
 
-    form.onsubmit = async (e) => {
-      e.preventDefault();
-      msg.textContent = "Đang lưu...";
-      msg.style.color = "blue";
-      saveBtn.disabled = true;
+    if (editBtn) editBtn.onclick = () => { editPopup.style.display = 'flex'; };
+    if (closeEdit) closeEdit.onclick = () => { editPopup.style.display = 'none'; };
+    if (editPopup) editPopup.addEventListener('click', (e) => {
+      if (e.target === editPopup) editPopup.style.display = 'none';
+    });
 
-      const usernameInput = document.getElementById("username");
-      const cooldown = parseInt(usernameInput.dataset.cooldown || 0, 10);
-      const now = Date.now();
-      if (cooldown && now < cooldown) {
+    // Lưu thay đổi
+    const saveBtn = document.getElementById('save-btn');
+    const msg = document.getElementById('msg');
+
+    if (saveBtn) {
+ saveBtn.onclick = async () => {
+    msg.textContent = "Đang lưu...";
+    msg.style.color = "blue";
+    saveBtn.disabled = true;
+
+    const usernameInput = document.getElementById("username");
+    const bioInput = document.getElementById("bio");
+    const targetUser = window.__targetUser;
+    const uuidInput = document.getElementById("uuid-display");
+    const requestedUuid = uuidInput.value.trim();
+
+    const formData = new FormData();
+    formData.append("username", usernameInput.value.trim());
+    formData.append("bio", bioInput.value.trim());
+    formData.append("uuid", requestedUuid); // Gửi giá trị UUID mới
+    formData.append("changeUuid", "1");      // Gửi flag xác nhận muốn đổi UUID
+
+    if (avatarInput.files[0]) {
+        formData.append("avatar", avatarInput.files[0]);
+    }
+
+    try {
+    const res = await fetch("/auth/me", {
+        method: 'PUT',
+        credentials: 'include',
+        body: formData
+    });
+
+    const data = await res.json(); // Backend trả về { message, user: { uuid, ... } }
+
+    if (res.ok) {
+        msg.style.color = "green";
+        msg.textContent = "✅ Cập nhật thành công!";
+
+        const newUuid = data.user.uuid;
+        const currentPath = window.location.pathname;
+
+        setTimeout(() => {
+            // Kiểm tra nếu URL hiện tại có chứa @ (định dạng profile của bạn)
+            if (currentPath.includes('@')) {
+                const oldUuidMatch = currentPath.match(/@([a-zA-Z0-9\-_]+)/);
+                const oldUuid = oldUuidMatch ? oldUuidMatch[1] : null;
+
+                // Nếu UUID mới khác UUID cũ trong URL, tiến hành chuyển hướng
+                if (oldUuid && oldUuid !== newUuid) {
+                    window.location.href = currentPath.replace(`@${oldUuid}`, `@${newUuid}`);
+                    return;
+                }
+            }
+            
+            // Nếu không thuộc trường hợp trên hoặc không đổi UUID, chỉ cần tải lại trang
+            location.reload();
+        }, 1000);
+    } else {
         msg.style.color = "red";
-        msg.textContent = "Bạn chưa tới hạn đổi tên. Vui lòng thử lại sau.";
+        msg.textContent = "❌ " + (data.error || "Có lỗi xảy ra");
+    }
+} catch (err) {
+    msg.textContent = "❌ Lỗi kết nối server.";
+}
+    // Lấy thông tin người đang xem (viewer) một cách chính xác
+    let viewer = null;
+    try {
+        const r = await fetch('/auth/me', { credentials: 'include' });
+        if (r.ok) {
+            const data = await r.json();
+            // Cấu trúc /auth/me trả về trực tiếp user object, không có .user
+            viewer = data; 
+        }
+    } catch (e) { console.error("Lỗi lấy thông tin viewer:", e); }
+
+    if (!viewer) {
+        msg.style.color = 'red';
+        msg.textContent = 'Vui lòng đăng nhập lại.';
         saveBtn.disabled = false;
         return;
-      }
+    }
 
-      const formData = new FormData();
-      formData.append("username", usernameInput.value.trim());
-      if (avatarInput.files[0]) formData.append("avatar", avatarInput.files[0]);
+    // Kiểm tra quyền: Là chủ sở hữu HOẶC là admin
+    const isOwner = viewer.uuid === targetUser.uuid;
+    const isAdmin = viewer.role === 'admin';
 
-      try {
-        const res = await fetch("/auth/me", {
-          method: "PUT",
-          credentials: 'include',
-          body: formData
-        });
+    if (isOwner) {
+        // Gửi qua /auth/me (Cho chính mình)
+const uuidInput = document.getElementById("uuid-display");
+    const requestedUuid = uuidInput.value.trim();
 
-        const data = await res.json();
-        if (res.ok) {
-          msg.style.color = "green";
-          msg.textContent = "✅ Cập nhật thành công!";
-          // update cookies (30 days)
-          const secureFlag = location.protocol === 'https:' ? '; Secure' : '';
-          if (data.user && data.user.username) document.cookie = `username=${encodeURIComponent(data.user.username)}; Max-Age=${30*24*60*60}; path=/; SameSite=Lax${secureFlag}`;
-          if (data.user && data.user.role) document.cookie = `role=${encodeURIComponent(data.user.role)}; Max-Age=${30*24*60*60}; path=/; SameSite=Lax${secureFlag}`;
-          if (data.user && data.user.avatar) document.cookie = `avatar=${encodeURIComponent(data.user.avatar)}; Max-Age=${30*24*60*60}; path=/; SameSite=Lax${secureFlag}`;
-          loadProfile();
-        } else {
-          msg.style.color = "red";
-          msg.textContent = "❌ " + (data.error || "Có lỗi xảy ra");
+    // 2. Kiểm tra nếu trống thì báo lỗi ngay tại trình duyệt
+    if (!requestedUuid) {
+        msg.style.color = 'red';
+        msg.textContent = '❌ Bạn chưa nhập mã định danh (UUID) mới!';
+        uuidInput.focus(); // Nhảy con trỏ vào ô để nhắc người dùng
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("username", document.getElementById("username").value.trim());
+    formData.append("bio", document.getElementById("bio").value.trim());
+    
+    // 3. QUAN TRỌNG: Đưa giá trị đã nhập vào FormData
+    formData.append("uuid", requestedUuid); 
+    
+    // Đánh dấu cho server biết là có yêu cầu đổi UUID
+    formData.append("changeUuid", "1");
+
+    if (avatarInput.files[0]) formData.append("avatar", avatarInput.files[0]);
+
+        // Logic đổi UUID (giữ nguyên)
+        const lastUuidChanged = new Date(targetUser.uuidLastChangedAt || targetUser.createdAt).getTime();
+        if (Date.now() - lastUuidChanged >= 30 * 24 * 60 * 60 * 1000) {
+            formData.append('changeUuid', '1');
         }
-      } catch (err) {
-        msg.style.color = "red";
-        msg.textContent = "Lỗi kết nối server.";
-      } finally {
-        saveBtn.disabled = false;
-      }
-    };
 
-    // Change password
-    const pwdForm = document.getElementById("change-password-form");
-    const pwdMsg = document.getElementById("pwd-msg");
+        // Tìm đoạn này trong profile.html và sửa lại:
+try {
+    const res = await fetch("/auth/me", { method: 'PUT', credentials: 'include', body: formData });
+    
+    // CHỈ GỌI DÒNG NÀY MỘT LẦN DUY NHẤT
+    const data = await res.json(); 
+
+    if (res.ok) {
+        msg.style.color = "green";
+        msg.textContent = "✅ Cập nhật thành công!";
+
+        const newUuid = data.user?.uuid;
+        const currentPath = window.location.pathname;
+
+        // Logic chuyển hướng nếu đổi UUID thành công
+        if (currentPath.includes('@') && newUuid) {
+            const oldUuidMatch = currentPath.match(/@([a-zA-Z0-9\-_:]+)/);
+            if (oldUuidMatch && oldUuidMatch[1] !== newUuid) {
+                alert("UUID của bạn đã thay đổi. Trang sẽ tự động chuyển hướng.");
+                window.location.href = currentPath.replace(`@${oldUuidMatch[1]}`, `@${newUuid}`);
+                return;
+            }
+        }
+        
+        setTimeout(() => {
+            editPopup.style.display = 'none';
+            loadProfile();
+        }, 1000);
+    } else {
+        // Hiển thị lỗi từ backend (ví dụ: Cooldown chưa hết)
+        msg.style.color = 'red';
+        msg.textContent = '❌ ' + (data.error || 'Có lỗi xảy ra');
+    }
+} catch (err) {
+    console.error(err); // Xem lỗi chi tiết tại Console log
+    msg.style.color = 'red';
+    msg.textContent = 'Lỗi kết nối server hoặc lỗi xử lý dữ liệu.';
+}
+    } else if (isAdmin) {
+        // Gửi qua /users/:uuid (Admin sửa cho người khác)
+        const body = { 
+            username: usernameInput.value.trim(),
+            bio: bioInput.value.trim()
+        };
+
+        try {
+            const res = await fetch(`/users/${encodeURIComponent(targetUser.uuid)}`, {
+                method: 'PUT',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (res.ok) {
+                msg.style.color = "green";
+                msg.textContent = "✅ Admin đã cập nhật thành công!";
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                const data = await res.json();
+                msg.style.color = 'red';
+                msg.textContent = '❌ ' + (data.error || 'Lỗi Admin');
+            }
+        } catch (err) {
+            msg.textContent = 'Lỗi kết nối server.';
+        }
+    } else {
+        msg.style.color = 'red';
+        msg.textContent = 'Bạn không có quyền thay đổi thông tin này.';
+    }
+    saveBtn.disabled = false;
+    };
+    }
+
+    // Đổi mật khẩu
     const changePwdBtn = document.getElementById("change-pwd-btn");
+    const pwdMsg = document.getElementById("pwd-msg");
+    if (changePwdBtn) {
+      changePwdBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        pwdMsg.textContent = '';
+        const currentPassword = document.getElementById("current-password").value;
+        const newPassword = document.getElementById("new-password").value;
+        const confirmPassword = document.getElementById("confirm-password").value;
 
-    pwdForm.onsubmit = async (e) => {
-      e.preventDefault();
-      pwdMsg.textContent = "";
-
-      const currentPassword = document.getElementById("current-password").value;
-      const newPassword = document.getElementById("new-password").value;
-      const confirmPassword = document.getElementById("confirm-password").value;
-
-      if (newPassword !== confirmPassword) {
-        pwdMsg.style.color = "red";
-        pwdMsg.textContent = "❌ Mật khẩu xác nhận không khớp!";
-        return;
-      }
-
-      if (newPassword.length < 6) {
-        pwdMsg.style.color = "red";
-        pwdMsg.textContent = "❌ Mật khẩu mới phải có ít nhất 6 ký tự.";
-        return;
-      }
-
-      changePwdBtn.disabled = true;
-      changePwdBtn.textContent = "Đang xử lý...";
-
-      try {
-        const res = await fetch("/auth/change-password", {
-          method: "PUT",
-          credentials: 'include',
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ currentPassword, newPassword })
-        });
-
-        const data = await res.json();
-        if (res.ok) {
-          pwdMsg.style.color = "green";
-          pwdMsg.textContent = "✅ " + data.message;
-          pwdForm.reset();
-        } else {
-          pwdMsg.style.color = "red";
-          pwdMsg.textContent = "❌ " + data.error;
+        if (newPassword !== confirmPassword) {
+          pwdMsg.style.color = 'red';
+          pwdMsg.textContent = '❌ Mật khẩu xác nhận không khớp!';
+          return;
         }
-      } catch (err) {
-        pwdMsg.style.color = "red";
-        pwdMsg.textContent = "❌ Lỗi kết nối server.";
-      } finally {
-        changePwdBtn.disabled = false;
-        changePwdBtn.textContent = "Cập nhật mật khẩu";
-      }
-    };
+        if (newPassword.length < 6) {
+          pwdMsg.style.color = 'red';
+          pwdMsg.textContent = '❌ Mật khẩu mới phải có ít nhất 6 ký tự.';
+          return;
+        }
 
-    // Run on load
+        changePwdBtn.disabled = true;
+        changePwdBtn.textContent = 'Đang xử lý...';
+
+        try {
+          const res = await fetch('/auth/change-password', {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentPassword, newPassword })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            pwdMsg.style.color = 'green';
+            pwdMsg.textContent = '✅ ' + (data.message || 'Đã cập nhật mật khẩu.');
+            document.getElementById('current-password').value = '';
+            document.getElementById('new-password').value = '';
+            document.getElementById('confirm-password').value = '';
+          } else {
+            pwdMsg.style.color = 'red';
+            pwdMsg.textContent = '❌ ' + (data.error || 'Có lỗi');
+          }
+        } catch (err) {
+          pwdMsg.style.color = 'red';
+          pwdMsg.textContent = '❌ Lỗi kết nối server.';
+        } finally {
+          changePwdBtn.disabled = false;
+          changePwdBtn.textContent = 'Cập nhật mật khẩu';
+        }
+      });
+    }
+
+    // Chạy khi load trang
     loadProfile();
   </script>
 </body>

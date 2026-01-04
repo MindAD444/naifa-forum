@@ -4,7 +4,22 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { sendMail } from '../utils/mailer.js';
 import { OAuth2Client } from "google-auth-library";
-import { connectDB } from "../config/db.js"; // Giữ import nhưng KHÔNG gọi await ở đây
+// UUID helper: generate either user<6digits> or based on provided name (for Google accounts)
+async function generateUniqueUuid(preferName) {
+  const stripDiacritics = (s) => (s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  const sanitize = (s) => stripDiacritics(s).slice(0, 20) || 'user';
+
+  let base = preferName ? sanitize(preferName) : "user" + Math.floor(100000 + Math.random() * 900000);
+  let candidate = base;
+  let exists = await User.findOne({ uuid: candidate });
+  
+  if (exists && preferName) {
+      let suffix = 1;
+      while (await User.findOne({ uuid: base + suffix })) { suffix++; }
+      candidate = base + suffix;
+  }
+  return candidate;
+}
 import auth from "../middleware/auth.js"; 
 
 // --- CÁC THƯ VIỆN UPLOAD ẢNH ---
@@ -68,15 +83,16 @@ router.post('/register/verify', async (req, res) => {
   if (parseInt(code) !== record.code) return res.status(400).json({ error: "Mã không đúng." });
 
   const hashed = await bcrypt.hash(record.password, 10);
-
-  await User.create({ 
-    username: record.username, 
-    email, 
-    password: hashed,
-    // Avatar mặc định tạo từ tên
-    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(record.username)}&background=random`
-  });
-
+  const uuid = await generateUniqueUuid(record.username);
+    const newUser = await User.create({
+        username: record.username,
+        email: record.email,
+        password: hashedPassword,
+        uuid: uuid,
+        // Đặt về mốc 0 để đổi được ngay lần đầu
+        uuidLastChangedAt: new Date(0),
+        usernameLastChangedAt: new Date(0)
+    });
   delete verificationCodes[email];
   res.json({ message: "Đăng ký thành công." });
 });
@@ -149,7 +165,22 @@ router.post("/google-login", async (req, res) => {
     let user = await User.findOne({ email });
 
     if (!user) {
-      return res.json({ status: "NEW_USER", email, googleId });
+      // Auto-create user using Google account name.
+      const rawName = payload.name || payload.given_name || (email ? email.split('@')[0] : 'user');
+      const username = (rawName || 'user').toString().trim().slice(0, 20);
+      const uuid = await generateUniqueUuid(rawName);
+      const avatarUrl = picture || `https://cdn.britannica.com/99/236599-050-1199AD2C/Mark-Zuckerberg-2019.jpg`;
+
+      user = await User.create({
+        username,
+        email,
+        googleId,
+        avatar: avatarUrl,
+        uuid,
+        uuidLastChangedAt: new Date(0),
+        usernameLastChangedAt: new Date(0),
+        usernameChangeCount: 0
+      });
     }
 
     // If Google provides a profile picture and user doesn't have an avatar saved,
@@ -182,30 +213,7 @@ router.post("/google-login", async (req, res) => {
   }
 });
 
-// Set username cho lần đầu login Google (CHO PHÉP TRÙNG TÊN)
-router.post("/set-username", async (req, res) => {
-  const { email, googleId, username, remember } = req.body;
 
-  // BỎ kiểm tra trùng username
-  const user = await User.create({ 
-    email, 
-    googleId, 
-    username,
-    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`
-  });
-
-  const expires = remember ? '30d' : '1d';
-  const token = jwt.sign({ id: user._id, username: user.username, role: user.role }, process.env.JWT_SECRET, { expiresIn: expires });
-  const maxAge = remember ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
-  res.cookie('token', token, {
-    httpOnly: true,
-    sameSite: 'Lax',
-    secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
-    maxAge
-  });
-
-  return res.json({ success: true, user: { id: user._id, username: user.username, role: user.role, avatar: user.avatar } });
-});
 
 // Logout (clear HttpOnly cookie)
 router.post('/logout', (req, res) => {
@@ -231,7 +239,7 @@ router.post('/forgot-password/request', async (req, res) => {
   resetCodes[email] = { code, createdAt: Date.now() };
 
   try {
-    await sendMail(email, `Mã đổi mật khẩu: ${code} (Hết hạn trong 5 phút)`);
+    await sendMail(email, `Mã đổi mật khẩu: ${code} (Hết hạn trong 10 phút)`);
     res.json({ message: "Mã xác thực đã được gửi!" });
   } catch (err) {
     res.status(500).json({ error: "Lỗi server khi gửi email." });
@@ -246,7 +254,7 @@ router.post('/forgot-password/reset', async (req, res) => {
   if (!record || record.code.toString() !== code.toString()) {
     return res.status(400).json({ error: "Mã xác thực không đúng." });
   }
-  if (Date.now() - record.createdAt > 5 * 60 * 1000) { // 5 phút
+  if (Date.now() - record.createdAt > 10 * 60 * 1000) {
     delete resetCodes[email];
     return res.status(400).json({ error: "Mã đã hết hạn." });
   }
@@ -266,113 +274,112 @@ router.post('/forgot-password/reset', async (req, res) => {
   }
 });
 
-// ============================================================
-// 5. PROFILE USER
-// ============================================================
-
-// [GET] /auth/me - Lấy thông tin
+// [GET] /auth/me - Lấy thông tin hiện tại của user đang đăng nhập
 router.get('/me', auth('user'), async (req, res) => {
-    const user = await User.findById(req.user.id).select('-password');
-    res.json(user);
+    try {
+        const user = await User.findById(req.user.id).select('-password');
+        if (!user) return res.status(404).json({ error: "Không tìm thấy người dùng." });
+        res.json(user);
+    } catch (err) {
+        res.status(500).json({ error: "Lỗi server" });
+    }
 });
 
-// [PUT] /auth/me - Cập nhật thông tin (Tên & Avatar)
-// Middleware 'upload.single('avatar')' sẽ xử lý file gửi lên có key là 'avatar'
+// [PUT] /auth/me - Cập nhật tổng hợp: Username, UUID, Bio, Avatar
 router.put('/me', auth('user'), upload.single('avatar'), async (req, res) => {
   try {
-    const { username } = req.body;
+    const { username, bio, uuid, changeUuid } = req.body;
     const updateData = {};
+    const incData = {};
 
-    // Load user data để kiểm tra lịch sử đổi tên
-    const user = await User.findById(req.user._id); 
+    // 1. Tải dữ liệu người dùng hiện tại
+    const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ error: "Không tìm thấy người dùng." });
 
-    // 1. Xử lý đổi tên (nếu có gửi lên và khác tên cũ)
+    const now = Date.now();
+
+    // 2. Xử lý đổi Username (Cooldown 7 ngày)
     if (username && username.trim() && username !== user.username) {
-      // Kiểm tra trùng tên (trừ tên hiện tại của chính mình)
-      const existingUser = await User.findOne({ username: username.trim(), _id: { $ne: req.user.id } });
-      if (existingUser) {
-        return res.status(400).json({ error: "Tên người dùng đã tồn tại." });
-      }
-
-      // --- LOGIC CHẶN ĐỔI TÊN THEO THỜI GIAN (7 ngày & 14 ngày) ---
-      const now = Date.now();
-      const lastChanged = user.usernameLastChangedAt ? user.usernameLastChangedAt.getTime() : user.createdAt.getTime();
-      const oneDay = 24 * 60 * 60 * 1000;
+      const lastChanged = user.usernameLastChangedAt ? user.usernameLastChangedAt.getTime() : 0;
+      const sevenDays = 7 * 24 * 60 * 60 * 1000;
       
-      let cooldownDays = 0;
-      if (user.usernameChangeCount === 0) {
-        // Lần đổi tên thứ nhất (sau khi đăng ký/đặt tên lần đầu). Cho phép đổi luôn.
-        cooldownDays = 0; 
-      } else if (user.usernameChangeCount === 1) {
-        // Lần đổi tên thứ hai: Cooldown 7 ngày
-        cooldownDays = 7;
-      } else {
-        // Lần đổi tên thứ ba trở đi: Cooldown 14 ngày
-        cooldownDays = 14;
+      if (now - lastChanged < sevenDays) {
+        const remaining = Math.ceil((sevenDays - (now - lastChanged)) / (24 * 60 * 60 * 1000));
+        return res.status(403).json({ error: `Bạn cần đợi thêm ${remaining} ngày để đổi tên.` });
       }
-
-      const cooldownDuration = cooldownDays * oneDay;
-      const nextChangeTime = lastChanged + cooldownDuration;
-
-      if (cooldownDays > 0 && now < nextChangeTime) {
-        const remainingTimeMs = nextChangeTime - now;
-        const remainingDays = Math.ceil(remainingTimeMs / oneDay);
-        return res.status(403).json({ 
-          error: `Bạn chỉ có thể đổi tên sau ${cooldownDays} ngày. Vui lòng đợi thêm khoảng ${remainingDays} ngày nữa.` 
-        });
-      }
-      
-      // Nếu pass: Cập nhật tên và thời gian/số lần đổi
       updateData.username = username.trim();
-      updateData.usernameLastChangedAt = now;
-      updateData.$inc = { usernameChangeCount: 1 }; // Tăng số lần đổi
-      // -------------------------------------------------------------------
+      updateData.usernameLastChangedAt = new Date(now);
+      incData.usernameChangeCount = 1;
     }
 
-    // 2. Xử lý đổi Avatar
+    // 3. Xử lý đổi UUID (Cooldown 30 ngày)
+    if (changeUuid === '1' || changeUuid === true) {
+      const lastUuidChanged = user.uuidLastChangedAt ? user.uuidLastChangedAt.getTime() : 0;
+      const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+
+      if (now - lastUuidChanged < thirtyDays) {
+        const remaining = Math.ceil((thirtyDays - (now - lastUuidChanged)) / (24 * 60 * 60 * 1000));
+        return res.status(403).json({ error: `Bạn cần đợi thêm ${remaining} ngày để đổi mã định danh.` });
+      }
+
+      const requestedUuid = uuid ? uuid.trim() : null;
+      if (!requestedUuid) {
+        return res.status(400).json({ error: "Mã định danh (UUID) không được để trống." });
+      }
+
+      if (requestedUuid !== user.uuid) {
+        if (/\s/.test(requestedUuid)) {
+          return res.status(400).json({ error: "UUID không được chứa khoảng trắng." });
+        }
+        // Kiểm tra UUID đã tồn tại chưa
+        const exists = await User.findOne({ uuid: requestedUuid });
+        if (exists) {
+          return res.status(400).json({ error: "Mã định danh này đã có người sử dụng." });
+        }
+        updateData.uuid = requestedUuid;
+        updateData.uuidLastChangedAt = new Date(now);
+        incData.uuidChangeCount = 1;
+      }
+    }
+
+    // 4. Xử lý Bio
+    if (bio !== undefined) {
+      updateData.bio = bio.trim();
+    }
+
+    // 5. Xử lý Avatar (Nếu có file upload qua Multer)
     if (req.file) {
-      updateData.avatar = req.file.path;
+      // Nếu dùng Cloudinary thì lấy path, nếu dùng local thì dùng filename
+      updateData.avatar = req.file.path || req.file.filename;
     }
 
-    // 3. Cập nhật vào DB
-    // Cần phải xử lý $inc (nếu có) riêng biệt trong findByIdAndUpdate
-    const incData = updateData.$inc;
-    delete updateData.$inc;
-
-    const updateQuery = { ...updateData };
-    if (incData) {
-        updateQuery.$inc = incData;
+    // 6. Xây dựng câu lệnh Update
+    const finalUpdate = { $set: updateData };
+    if (Object.keys(incData).length > 0) {
+      finalUpdate.$inc = incData;
     }
 
-    // Nếu không có gì để update, trả về luôn
-    if (Object.keys(updateQuery).length === 0 && !updateQuery.$inc) {
-        return res.json({ message: "Không có thay đổi nào được gửi lên." });
+    // Nếu không có thay đổi nào thực sự được gửi lên
+    if (Object.keys(updateData).length === 0 && !finalUpdate.$inc) {
+      return res.status(400).json({ error: "Không có thay đổi nào để cập nhật." });
     }
 
-
+    // 7. Cập nhật vào Database
     const updatedUser = await User.findByIdAndUpdate(
-      req.user.id, 
-      updateQuery, 
+      req.user.id,
+      finalUpdate,
       { new: true, runValidators: true }
-    );
-    
-    if (!updatedUser) {
-        return res.status(404).json({ error: "Lỗi cập nhật người dùng." });
-    }
+    ).select('-password -email -googleId');
 
+    // 8. Trả về kết quả
     res.json({
       message: "Cập nhật thành công!",
-      user: {
-        id: updatedUser._id,
-        username: updatedUser.username,
-        role: updatedUser.role,
-        avatar: updatedUser.avatar
-      }
+      user: updatedUser
     });
+
   } catch (err) {
     console.error("PUT /auth/me error:", err);
-    res.status(500).json({ error: "Lỗi server khi cập nhật hồ sơ" });
+    res.status(500).json({ error: "Lỗi hệ thống khi cập nhật hồ sơ." });
   }
 });
 // ============================================================

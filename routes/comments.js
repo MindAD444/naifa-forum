@@ -1,6 +1,7 @@
 import express from "express";
 import Comment from "../models/Comment.js";
-import Post from "../models/Post.js";
+import User from "../models/User.js";
+
 import auth from "../middleware/auth.js";
 import mongoose from "mongoose";
 
@@ -22,23 +23,36 @@ router.get("/:postId", async (req, res) => {
 
     const skip = (page - 1) * limit;
 
-    // Return only top-level (root) comments and include direct replies count for lazy-loading
-    const roots = await Comment.find({ post: postId, parent: null })
-      .populate("author", "username")
-      .sort({ createdAt: 1 })
-      .lean();
-
-    // Aggregate counts of direct replies per parent
-    const counts = await Comment.aggregate([
-      { $match: { post: new mongoose.Types.ObjectId(postId), parent: { $ne: null } } },
-      { $group: { _id: "$parent", count: { $sum: 1 } } }
+    // Return only top-level (root) comments and include total descendant replies count for lazy-loading
+    // Use aggregation with $graphLookup to compute descendant counts per root in a single pipeline
+    const rootsAgg = await Comment.aggregate([
+      { $match: { post: new mongoose.Types.ObjectId(postId), parent: null } },
+      { $sort: { createdAt: 1 } },
+      { $lookup: { from: 'users', localField: 'author', foreignField: '_id', as: 'author' } },
+      { $unwind: { path: '$author', preserveNullAndEmptyArrays: true } },
+      { $graphLookup: {
+        from: 'comments',
+        startWith: '$_id',
+        connectFromField: '_id',
+        connectToField: 'parent',
+        as: 'descendants',
+        restrictSearchWithMatch: { post: new mongoose.Types.ObjectId(postId) }
+      } },
+      { $addFields: { repliesCount: { $size: '$descendants' } } },
+      { $project: { descendants: 0 } }
     ]);
-    const countMap = {};
-    counts.forEach(c => { countMap[c._id.toString()] = c.count; });
 
-    const results = roots.map(r => ({
-      ...r,
-      repliesCount: countMap[r._id.toString()] || 0
+    // Normalize author and fields to match populated shape
+    const results = rootsAgg.map(r => ({
+      _id: r._id,
+      post: r.post,
+      content: r.content,
+      parent: r.parent,
+      depth: r.depth,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+      author: r.author ? { _id: r.author._id, username: r.author.username, uuid: r.author.uuid, avatar: r.author.avatar } : null,
+      repliesCount: r.repliesCount || 0
     }));
 
     res.json({ comments: results });
@@ -73,15 +87,45 @@ router.post("/:postId", auth("user"), async (req, res) => {
       mentionIds = users.map(u => u._id);
     }
 
+    // Determine depth: if parent provided, lookup parent depth
+    let depth = 1;
+    let parentId = parent && isValidObjectId(parent) ? parent : null;
+    if (parentId) {
+      const parentComment = await Comment.findById(parentId).populate('author', 'uuid');
+      if (parentComment) {
+        // Normal case: new depth would be parent.depth + 1
+        depth = (parentComment.depth || 1) + 1;
+        // If parent is already at max depth (3), instead create a sibling at the same depth
+        if (parentComment.depth >= 3) {
+          // prepend mention in content (avoid duplication)
+          const mentionToken = `@${parentComment.author?.uuid || ''}`;
+          const trimmed = content.trim();
+          const finalContent = trimmed.startsWith(mentionToken) ? trimmed : `${mentionToken} ${trimmed}`;
+          const mUser = await User.findById(parentComment.author?._id).select('_id');
+          if (mUser) mentionIds.push(mUser._id);
+
+          // Make the new comment a sibling: use the same parent as the target comment's parent
+          parentId = parentComment.parent ? parentComment.parent.toString() : null;
+
+          // Keep depth equal to the target comment's depth (so it's at the same level)
+          depth = parentComment.depth;
+
+          // override content
+          req.body.content = finalContent;
+        }
+      }
+    }
+
     const newComment = await Comment.create({
       post: postId,
       author: req.user._id,
-      content: content.trim(),
-      parent: parent && isValidObjectId(parent) ? parent : null,
+      content: req.body.content.trim(),
+      parent: parentId,
       mentions: mentionIds,
+      depth
     });
 
-    await newComment.populate("author", "username");
+    await newComment.populate("author", "username uuid avatar");
 
     res.status(201).json(newComment);
 
@@ -97,21 +141,36 @@ router.get('/:postId/replies/:commentId', async (req, res) => {
     const { postId, commentId } = req.params;
     if (!isValidObjectId(postId) || !isValidObjectId(commentId)) return res.status(400).json({ error: 'ID không hợp lệ' });
 
-    const replies = await Comment.find({ post: postId, parent: commentId })
-      .populate('author', 'username')
-      .sort({ createdAt: 1 })
-      .lean();
-
-    // Include repliesCount for each reply (to know if they have nested replies)
-    const ids = replies.map(r => r._id);
-    const counts = await Comment.aggregate([
-      { $match: { post: new mongoose.Types.ObjectId(postId), parent: { $in: ids.map(i => new mongoose.Types.ObjectId(i)) } } },
-      { $group: { _id: '$parent', count: { $sum: 1 } } }
+    // Use aggregation to get direct replies and include total descendant counts per reply
+    const repliesAgg = await Comment.aggregate([
+      { $match: { post: new mongoose.Types.ObjectId(postId), parent: new mongoose.Types.ObjectId(commentId) } },
+      { $sort: { createdAt: 1 } },
+      { $lookup: { from: 'users', localField: 'author', foreignField: '_id', as: 'author' } },
+      { $unwind: { path: '$author', preserveNullAndEmptyArrays: true } },
+      { $graphLookup: {
+        from: 'comments',
+        startWith: '$_id',
+        connectFromField: '_id',
+        connectToField: 'parent',
+        as: 'descendants',
+        restrictSearchWithMatch: { post: new mongoose.Types.ObjectId(postId) }
+      } },
+      { $addFields: { repliesCount: { $size: '$descendants' } } },
+      { $project: { descendants: 0 } }
     ]);
-    const countMap = {};
-    counts.forEach(c => { countMap[c._id.toString()] = c.count; });
 
-    const results = replies.map(r => ({ ...r, repliesCount: countMap[r._id.toString()] || 0 }));
+    const results = repliesAgg.map(r => ({
+      _id: r._id,
+      post: r.post,
+      content: r.content,
+      parent: r.parent,
+      depth: r.depth,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+      author: r.author ? { _id: r.author._id, username: r.author.username, uuid: r.author.uuid, avatar: r.author.avatar } : null,
+      repliesCount: r.repliesCount || 0
+    }));
+
     res.json({ replies: results });
   } catch (err) {
     console.error('GET replies error:', err);

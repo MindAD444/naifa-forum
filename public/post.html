@@ -8,7 +8,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title id="page-title">Đang tải bài viết...</title>
-    <link rel="icon" href="./favicon.svg" />
+    <link rel="icon" sizes="192x192" href="/favicon-192.png">
     <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -154,12 +154,21 @@
         const repliesHtml = (comment.repliesCount && comment.repliesCount > 0) ?
             `<div class="comment-replies" id="replies-${comment._id}"><button class="load-replies-btn" data-id="${comment._id}">Xem ${comment.repliesCount} trả lời</button></div>` : '';
 
+        const authorName = comment.author?.username || 'Ẩn danh';
+        const authorUuid = comment.author?.uuid;
+        const authorAvatar = comment.author?.avatar || './favicon.ico';
+        const authorLink = authorUuid ? `/@${authorUuid}` : '#';
         return `
             <div class="comment-item" id="comment-${comment._id}">
                 ${deleteBtn}
-                <div class="comment-meta"><strong>${comment.author?.username || "Ẩn danh"}</strong> • ${formatTime(comment.createdAt)} · <a href="#" onclick="setReplyTo('${comment._id}','${comment.author?.username || ''}');return false;">Trả lời</a></div>
-                <p style="margin-top: 5px;">${contentHtml}</p>
-                ${repliesHtml}
+                <div class="comment-row">
+                  <a href="${authorLink}"><img class="comment-avatar" src="${authorAvatar}" alt="${authorName}"></a>
+                  <div class="comment-body">
+                    <div class="comment-meta"><strong><a href="${authorLink}">${authorName}</a></strong> • ${formatTime(comment.createdAt)} · <a href="#" onclick="setReplyTo('${comment._id}','${authorUuid || authorName}');return false;">Trả lời</a></div>
+                    <p style="margin-top: 5px;">${contentHtml}</p>
+                    ${repliesHtml}
+                  </div>
+                </div>
             </div>
         `;
     }
@@ -185,7 +194,11 @@
                 // If this reply has its own replies, include a nested container with load button
                 const nestedRepliesHtml = (r.repliesCount && r.repliesCount > 0) ?
                     `<div class="comment-replies" id="replies-${r._id}"><button class="load-replies-btn" data-id="${r._id}">Xem ${r.repliesCount} trả lời</button></div>` : '';
-                return `<div class="comment-item reply-item" id="comment-${r._id}">${deleteBtn}<div class="comment-meta"><strong>${r.author?.username || 'Ẩn danh'}</strong> • ${formatTime(r.createdAt)} · <a href="#" onclick="setReplyTo('${r._id}','${r.author?.username || ''}');return false;">Trả lời</a></div><p style="margin-top:5px">${contentHtml}</p>${nestedRepliesHtml}</div>`;
+                const authorName = r.author?.username || 'Ẩn danh';
+                const authorUuid = r.author?.uuid;
+                const authorAvatar = r.author?.avatar || './favicon.ico';
+                const authorLink = authorUuid ? `/@${authorUuid}` : '#';
+                return `<div class="comment-item reply-item" id="comment-${r._id}">${deleteBtn}<div class="comment-row"><a href="${authorLink}"><img class="comment-avatar" src="${authorAvatar}" alt="${authorName}"></a><div class="comment-body"><div class="comment-meta"><strong><a href="${authorLink}">${authorName}</a></strong> • ${formatTime(r.createdAt)} · <a href="#" onclick="setReplyTo('${r._id}','${authorUuid || authorName}');return false;">Trả lời</a></div><p style="margin-top:5px">${contentHtml}</p>${nestedRepliesHtml}</div></div></div>`;
             }).join('');
             container.innerHTML = html || '<p style="color:var(--text-light)">Chưa có trả lời nào.</p>';
             container.dataset.loaded = '1';
@@ -267,7 +280,10 @@
 
             document.getElementById("page-title").textContent = post.title + " - Forum";
             document.getElementById("post-title").textContent = post.title;
-            document.getElementById("post-author").innerHTML = `👤 Tác giả: ${post.author?.username || "Ẩn danh"}`;
+            const pAuthorName = post.author?.username || 'Ẩn danh';
+            const pAuthorUuid = post.author?.uuid;
+            const pAuthorLink = pAuthorUuid ? `<a href="/@${pAuthorUuid}">${pAuthorName}</a>` : pAuthorName;
+            document.getElementById("post-author").innerHTML = `👤 Tác giả: ${pAuthorLink}`;
             document.getElementById("post-date").innerHTML = `🕐 Đăng lúc: ${formatTime(post.createdAt)}`;
             document.getElementById("post-content").innerHTML = post.content.replace(/\n/g, '<br>');
 

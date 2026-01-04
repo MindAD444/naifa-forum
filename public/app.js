@@ -104,7 +104,6 @@ document.addEventListener("DOMContentLoaded", () => {
   if (loadMoreCommentsBtn) loadMoreCommentsBtn.onclick = () => loadCommentChunk();
 });
 
-
 function checkLoginStatus() {
   // First try legacy localStorage (migration fallback)
   const token = localStorage.getItem("token");
@@ -153,7 +152,7 @@ function checkLoginStatus() {
     if (loginLink) loginLink.classList.add('hidden');
     if (registerLink) registerLink.classList.add('hidden');
     if (userDisplaySidebar) userDisplaySidebar.textContent = uname;
-    if (profileLink) profileLink.classList.remove('hidden');
+    if (profileLink) { profileLink.classList.remove('hidden'); profileLink.href = `/@${user.uuid || user._id}`; }
     if (createLink) createLink.classList.remove('hidden');
     if (userDisplaySidebar) userDisplaySidebar.textContent = `Xin chào, ${uname}!`;
     if (sidebarAuth) sidebarAuth.classList.remove('hidden');

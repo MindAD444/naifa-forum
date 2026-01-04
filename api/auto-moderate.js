@@ -1,15 +1,4 @@
-// api/auto-moderate.js (Phiên bản đã sửa lỗi cho Vercel Cron Job)
-
-// Lưu ý: Trong Vercel Serverless Function, bạn không cần import 'dotenv/config'.
-// Vercel tự động cung cấp các biến qua process.env.
-// Tuy nhiên, việc sử dụng Post model bên ngoài là cần thiết.
-
-// Giả định bạn có một hàm hoặc cách import model MongoDB (Mongoose) như sau:
-// Nếu bạn dùng Next.js, bạn có thể cần phải import model theo cách khác.
-import Post from '../models/Post.js'; 
-import { Buffer } from 'buffer'; // Buffer thường được yêu cầu trong môi trường Node/Vercel
-
-// Lấy API Key và CRON Secret từ biến môi trường
+// =================================================================
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const CRON_SECRET = process.env.CRON_SECRET; // Cần thiết cho bảo mật
 const MODERATION_MODEL = 'gemini-2.5-flash'; // Đã sửa từ 1.5-flash
@@ -18,7 +7,6 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MO
 
 // --- HÀM HỖ TRỢ: TẢI ẢNH TỪ URL CLOUDINARY VÀ CHUYỂN SANG BASE64 ---
 async function urlToBase64(url) {
-    // ... (Giữ nguyên hàm này) ...
     try {
         const response = await fetch(url);
         if (!response.ok) {
@@ -41,7 +29,6 @@ async function urlToBase64(url) {
 }
 
 // --- HÀM DUYỆT BÀI (TEXT + ẢNH) ---
-// ... (Giữ nguyên hàm này) ...
 async function moderateWithAI(post) {
   // 1. Chuẩn bị dữ liệu ảnh (nếu có)
   let imageParts = [];

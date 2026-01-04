@@ -16,6 +16,8 @@ const commentSchema = new mongoose.Schema({
     ref: 'Comment',
     default: null,
   },
+  // depth: 1 = root, 2 = reply, 3 = nested reply
+  depth: { type: Number, default: 1 },
   content: { 
     type: String, 
     required: true, 

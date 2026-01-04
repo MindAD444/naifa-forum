@@ -5,7 +5,6 @@ import auth from '../middleware/auth.js';
 import { v2 as cloudinary } from 'cloudinary'; 
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import multer from 'multer';
-import { connectDB } from "../config/db.js";
 const router = express.Router();
 const storage = new CloudinaryStorage({
     cloudinary: cloudinary,

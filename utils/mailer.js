@@ -18,7 +18,6 @@ const transporter = nodemailer.createTransport({
 
 export const sendMail = async (email, code) => {
   const mailOptions = {
-    // SENDER phải là email đã được xác minh trong SendGrid (từ biến môi trường)
     from: process.env.EMAIL_SENDER, 
     to: email,
     subject: 'Mã xác thực đăng ký Forum',

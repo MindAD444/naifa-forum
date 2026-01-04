@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Home - Forum</title>
-  <link rel="icon" href="./favicon.svg" />
+  <link rel="icon" sizes="192x192" href="/favicon-192.png">
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -80,7 +80,7 @@
             <h3>${p.title}</h3>
             <p>${snippet.replace(/\n/g,'<br>')}</p>
             <div class="post-meta">
-              <small>Tác giả: ${p.author?.username || "Ẩn danh"}</small><br>
+              <small>Tác giả: ${p.author?.uuid ? `<a href="/@${p.author.uuid}">${p.author.username}</a>` : (p.author?.username || "Ẩn danh")}</small><br>
               <small>Đăng lúc: ${formatTime(p.createdAt)}</small>
             </div>
           </article>
@@ -150,17 +150,30 @@ async function loadKnowledge(page = 1, append = false) {
       itemsContainer.appendChild(div);
     });
     if (data.hasMore) {
+      // remove any previous load-more button to avoid duplicates
+      const existingBtn = document.getElementById('load-more-knowledge');
+      if (existingBtn) existingBtn.remove();
+
       const btn = document.createElement('button');
       btn.id = 'load-more-knowledge';
       btn.className = 'load-more-btn';
       btn.textContent = 'Xem thêm thông tin';
-      btn.onclick = () => loadKnowledge(currentPage + 1, true);
+      btn.onclick = () => {
+        btn.disabled = true;
+        btn.textContent = 'Đang tải...';
+        loadKnowledge(currentPage + 1, true);
+      };
       actionsContainer.appendChild(btn);
       currentPage++;
-    } else if (append && data.items.length > 0) {
-      actionsContainer.innerHTML = `<p style="text-align:center; color:var(--text-light); margin:20px 0;">
-        Đã hết thông tin hay hôm nay
-      </p>`;
+    } else {
+      // no more items: clear any existing button and show message when appending
+      const existingBtn = document.getElementById('load-more-knowledge');
+      if (existingBtn) existingBtn.remove();
+      if (append && data.items.length > 0) {
+        actionsContainer.innerHTML = `<p style="text-align:center; color:var(--text-light); margin:20px 0;">
+          Đã hết thông tin hay hôm nay
+        </p>`;
+      }
     }
 
   } catch (err) {
